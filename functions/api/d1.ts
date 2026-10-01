@@ -16,30 +16,9 @@ const CORS_HEADERS = {
 };
 
 async function ensureTables(db: D1Database) {
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS accounts (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      username TEXT,
-      pin TEXT NOT NULL,
-      role TEXT,
-      avatar_color TEXT,
-      is_active INTEGER DEFAULT 1,
-      updated_at TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS user_finance (
-      user_id TEXT PRIMARY KEY,
-      data_json TEXT NOT NULL,
-      updated_at TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS app_settings (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL,
-      updated_at TEXT
-    );
-  `);
+  await db.prepare('CREATE TABLE IF NOT EXISTS accounts (id TEXT PRIMARY KEY, name TEXT NOT NULL, username TEXT, pin TEXT NOT NULL, role TEXT, avatar_color TEXT, is_active INTEGER DEFAULT 1, updated_at TEXT);').run();
+  await db.prepare('CREATE TABLE IF NOT EXISTS user_finance (user_id TEXT PRIMARY KEY, data_json TEXT NOT NULL, updated_at TEXT);').run();
+  await db.prepare('CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT);').run();
 }
 
 export async function onRequest(context: { request: Request; env: Env }): Promise<Response> {
