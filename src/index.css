@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --brand-primary: #15856c;
+    --brand-hover: #116c58;
+    --brand-light: #eaf5f1;
+    --brand-dark: #0d4a3c;
+    --brand-border: #d4e8e0;
+  }
+}
+
+/* Ambient gradient background matching the template in image.png */
+.bg-fintech-canvas {
+  background: radial-gradient(ellipse at 15% 10%, rgba(206, 238, 226, 0.55) 0%, rgba(240, 248, 245, 0.8) 40%, #f6faf8 100%);
+  min-height: 100vh;
+}
+
+.dark .bg-fintech-canvas {
+  background: radial-gradient(ellipse at 15% 10%, rgba(13, 58, 48, 0.45) 0%, rgba(13, 23, 21, 0.9) 45%, #0b1311 100%);
+  min-height: 100vh;
+}
+
+/* Soft fintech card shadow */
+.shadow-fintech {
+  box-shadow: 0 10px 25px -5px rgba(21, 133, 108, 0.05), 0 4px 10px -2px rgba(0, 0, 0, 0.02);
+}
+
+.dark .shadow-fintech {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
