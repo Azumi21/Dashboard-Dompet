@@ -387,8 +387,28 @@ function replaceSheetData(sheetName, items) {
   };
 
   const [copiedSyncUrl, setCopiedSyncUrl] = useState(false);
+  const [copiedTokenOnly, setCopiedTokenOnly] = useState(false);
+  const [customDomain, setCustomDomain] = useState(() => {
+    return localStorage.getItem('dompetku_custom_domain') || '';
+  });
+
+  const handleSaveCustomDomain = (val: string) => {
+    setCustomDomain(val);
+    localStorage.setItem('dompetku_custom_domain', val.trim());
+  };
+
+  const isAiStudio = typeof window !== 'undefined' && window.location.origin.includes('run.app');
+  const baseOrigin = customDomain.trim()
+    ? customDomain.trim().replace(/\/$/, '')
+    : window.location.origin;
+
+  // Generate full sync token containing both gasUrl and accounts
+  const rawSyncToken = gasUrl
+    ? btoa(unescape(encodeURIComponent(JSON.stringify({ gas: gasUrl, accs: AuthService.getAccounts() }))))
+    : '';
+
   const quickConnectLink = gasUrl 
-    ? `${window.location.origin}${window.location.pathname}?gas=${encodeURIComponent(gasUrl)}`
+    ? `${baseOrigin}${window.location.pathname}?sync=${encodeURIComponent(rawSyncToken)}`
     : '';
 
   const handleCopySyncLink = () => {
@@ -396,6 +416,33 @@ function replaceSheetData(sheetName, items) {
     navigator.clipboard.writeText(quickConnectLink);
     setCopiedSyncUrl(true);
     setTimeout(() => setCopiedSyncUrl(false), 3000);
+  };
+
+  const handleCopyRawToken = () => {
+    if (!rawSyncToken) return;
+    navigator.clipboard.writeText(rawSyncToken);
+    setCopiedTokenOnly(true);
+    setTimeout(() => setCopiedTokenOnly(false), 3000);
+  };
+
+  const [syncingAccountsToGas, setSyncingAccountsToGas] = useState(false);
+  const [syncAccStatus, setSyncAccStatus] = useState<string | null>(null);
+
+  const handlePushAccountsToSpreadsheet = async () => {
+    if (!gasUrl) {
+      alert('Silakan hubungkan URL Google Apps Script terlebih dahulu di tab Koneksi.');
+      return;
+    }
+    setSyncingAccountsToGas(true);
+    setSyncAccStatus(null);
+    const res = await GasService.syncAccountsToSpreadsheet(gasUrl, accounts);
+    setSyncingAccountsToGas(false);
+    if (res.success) {
+      setSyncAccStatus('Profil akun & PIN berhasil disimpan ke Google Spreadsheet!');
+    } else {
+      setSyncAccStatus('Gagal menyimpan ke Google Spreadsheet: ' + res.message);
+    }
+    setTimeout(() => setSyncAccStatus(null), 4000);
   };
 
   const handleDownloadBackup = () => {
@@ -611,7 +658,7 @@ function replaceSheetData(sheetName, items) {
                       </div>
                     </div>
 
-                    {/* Info & Tombol */}
+                      {/* Info & Tombol */}
                     <div className="space-y-2.5 flex-1 text-center md:text-left">
                       <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-[#15856c] dark:text-emerald-300 text-xs font-bold">
                         <Smartphone className="w-3.5 h-3.5" />
@@ -624,7 +671,24 @@ function replaceSheetData(sheetName, items) {
                         Cukup <strong>scan QR Code</strong> di samping menggunakan kamera HP Anda, atau klik tombol <strong>Salin Link Cepat HP</strong> dan buka di browser HP. Saat web terbuka di HP, seluruh profil akun, PIN, dan catatan transaksi otomatis disinkronkan secara instan!
                       </p>
 
-                      <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 pt-1">
+                      {/* Domain Cloudflare Target */}
+                      <div className="pt-1 text-left">
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          Domain Website Cloudflare Anda (Diisi jika buka di HP):
+                        </label>
+                        <input
+                          type="url"
+                          placeholder="https://contoh-aplikasi.pages.dev"
+                          value={customDomain}
+                          onChange={(e) => handleSaveCustomDomain(e.target.value)}
+                          className="w-full max-w-md px-3 py-1.5 text-xs font-mono rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-[#15856c]"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          {isAiStudio ? 'Masukkan link website Cloudflare Anda agar link QR Code dan WhatsApp otomatis mengarahkan ke HP Anda.' : 'Otomatis menggunakan domain saat ini.'}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 pt-2">
                         <button
                           type="button"
                           onClick={handleCopySyncLink}
@@ -632,6 +696,16 @@ function replaceSheetData(sheetName, items) {
                         >
                           {copiedSyncUrl ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                           <span>{copiedSyncUrl ? 'Link HP Tersalin!' : 'Salin Tautan Cepat HP'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleCopyRawToken}
+                          className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-all shadow-2xs active:scale-95"
+                          title="Salin token untuk ditempelkan di tombol 'Sambungkan Google Spreadsheet' pada layar Login HP"
+                        >
+                          {copiedTokenOnly ? <Check className="w-4 h-4 text-emerald-600" /> : <Code className="w-4 h-4" />}
+                          <span>{copiedTokenOnly ? 'Token Tersalin!' : 'Salin Token Saja'}</span>
                         </button>
 
                         <a
@@ -1130,22 +1204,42 @@ function replaceSheetData(sheetName, items) {
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                setAccFormName('');
-                setAccFormUsername('');
-                setAccFormRole('Pribadi');
-                setAccFormColor('emerald');
-                setAccFormPin('123456');
-                setShowAddAccountModal(true);
-              }}
-              className="px-4 py-2.5 rounded-xl bg-[#15856c] hover:bg-[#116c58] text-white text-xs font-bold flex items-center justify-center gap-2 transition-colors shadow-xs shrink-0"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>+ Tambah Akun Baru</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handlePushAccountsToSpreadsheet}
+                disabled={syncingAccountsToGas || !gasUrl}
+                className="px-4 py-2.5 rounded-xl border border-[#15856c] text-[#15856c] dark:text-emerald-300 hover:bg-[#eaf5f1] dark:hover:bg-emerald-950/40 text-xs font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-40 shadow-2xs"
+                title="Unggah akun dan PIN saat ini ke Google Spreadsheet agar bisa dibuka di HP otomatis"
+              >
+                <Database className="w-4 h-4" />
+                <span>{syncingAccountsToGas ? 'Menyimpan...' : 'Simpan Akun ke Spreadsheet'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setAccFormName('');
+                  setAccFormUsername('');
+                  setAccFormRole('Pribadi');
+                  setAccFormColor('emerald');
+                  setAccFormPin('123456');
+                  setShowAddAccountModal(true);
+                }}
+                className="px-4 py-2.5 rounded-xl bg-[#15856c] hover:bg-[#116c58] text-white text-xs font-bold flex items-center justify-center gap-2 transition-colors shadow-xs shrink-0"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>+ Tambah Akun Baru</span>
+              </button>
+            </div>
           </div>
+
+          {syncAccStatus && (
+            <div className="p-3 rounded-xl text-xs bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{syncAccStatus}</span>
+            </div>
+          )}
 
           {/* Card 2: Accounts List */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

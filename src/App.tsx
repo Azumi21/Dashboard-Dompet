@@ -89,17 +89,41 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // Check for Quick Connect URL parameter (?gas=... or ?connect=...) from QR Code / Sync Link
+  // Check for Quick Connect URL parameter (?sync=... or ?gas=...) from QR Code / Sync Link
   useEffect(() => {
     try {
       const searchParams = new URLSearchParams(window.location.search);
+      const syncToken = searchParams.get('sync');
       const incomingGas = searchParams.get('gas') || searchParams.get('connect');
-      if (incomingGas && incomingGas.startsWith('http')) {
-        StorageService.setGasUrl(incomingGas, currentUser.id);
-        setGasUrl(incomingGas);
+
+      let targetGas = incomingGas || '';
+
+      if (syncToken) {
+        try {
+          const jsonStr = decodeURIComponent(escape(atob(syncToken)));
+          const payload = JSON.parse(jsonStr);
+          if (payload) {
+            if (Array.isArray(payload.accs) && payload.accs.length > 0) {
+              AuthService.saveAccounts(payload.accs);
+              const freshAccs = AuthService.getAccounts();
+              setAllAccounts(freshAccs);
+              setCurrentUser(freshAccs[0]);
+            }
+            if (payload.gas) {
+              targetGas = payload.gas;
+            }
+          }
+        } catch (e) {
+          console.error('Error parsing sync token:', e);
+        }
+      }
+
+      if (targetGas && targetGas.startsWith('http')) {
+        StorageService.setGasUrl(targetGas, currentUser.id);
+        setGasUrl(targetGas);
 
         setIsRefreshing(true);
-        GasService.fetchAllData(incomingGas).then((res) => {
+        GasService.fetchAllData(targetGas).then((res) => {
           setIsRefreshing(false);
           if (res.success && res.data) {
             StorageService.saveData(res.data, currentUser.id);
@@ -108,12 +132,14 @@ export default function App() {
             setAllAccounts(freshAccounts);
             const activeAcc = AuthService.getActiveAccount();
             setCurrentUser(activeAcc);
-            showToast('Perangkat berhasil terhubung otomatis! Data transaksi dan profil akun telah sinkron.', 'success', 'Sinkronisasi Berhasil');
+            showToast('Perangkat berhasil terhubung otomatis! Profil akun dan transaksi telah sinkron.', 'success', 'Sinkronisasi Berhasil');
           } else {
             showToast('URL Google Apps Script disimpan: ' + (res.message || ''), 'info', 'Terhubung');
           }
         });
+      }
 
+      if (syncToken || incomingGas) {
         // Bersihkan parameter query dari address bar browser
         window.history.replaceState({}, document.title, window.location.pathname);
       }
