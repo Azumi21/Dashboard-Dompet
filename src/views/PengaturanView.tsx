@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Settings,
   Database,
@@ -22,7 +22,10 @@ import {
   UserPlus,
   Trash2,
   Edit3,
-  UserCheck
+  UserCheck,
+  Smartphone,
+  QrCode,
+  Share2
 } from 'lucide-react';
 import { AppData, UserAccount, UserAvatarColor } from '../types/finance';
 import { GasService } from '../services/gasService';
@@ -76,6 +79,10 @@ export const PengaturanView: React.FC<PengaturanViewProps> = ({
   const [accFormRole, setAccFormRole] = useState('Pribadi');
   const [accFormColor, setAccFormColor] = useState<UserAvatarColor>('emerald');
   const [accFormPin, setAccFormPin] = useState('123456');
+
+  useEffect(() => {
+    setAccounts(AuthService.getAccounts());
+  }, [currentUser, appData]);
 
   const handleConfirmDeleteAccount = () => {
     if (!accountToDelete) return;
@@ -379,6 +386,18 @@ function replaceSheetData(sheetName, items) {
     setTimeout(() => setCopiedCode(false), 3000);
   };
 
+  const [copiedSyncUrl, setCopiedSyncUrl] = useState(false);
+  const quickConnectLink = gasUrl 
+    ? `${window.location.origin}${window.location.pathname}?gas=${encodeURIComponent(gasUrl)}`
+    : '';
+
+  const handleCopySyncLink = () => {
+    if (!quickConnectLink) return;
+    navigator.clipboard.writeText(quickConnectLink);
+    setCopiedSyncUrl(true);
+    setTimeout(() => setCopiedSyncUrl(false), 3000);
+  };
+
   const handleDownloadBackup = () => {
     const jsonStr = StorageService.exportBackup();
     const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -567,6 +586,66 @@ function replaceSheetData(sheetName, items) {
                 <div>
                   <div className="font-bold">{testResult.success ? 'Koneksi Berhasil!' : 'Koneksi Gagal'}</div>
                   <div className="mt-0.5">{testResult.message}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Sambungkan ke HP Instan (QR Code & Link Cepat) */}
+            {gasUrl && (
+              <div className="mt-5 pt-5 border-t border-slate-200 dark:border-slate-800">
+                <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-50/80 via-white to-teal-50/60 dark:from-emerald-950/20 dark:via-slate-900 dark:to-teal-950/20 border border-emerald-200/80 dark:border-emerald-800/60 shadow-xs">
+                  <div className="flex flex-col md:flex-row gap-5 items-center">
+                    {/* QR Code */}
+                    <div className="shrink-0 text-center">
+                      <div className="bg-white p-2.5 rounded-2xl border border-emerald-200 dark:border-emerald-900/60 shadow-sm inline-block">
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(quickConnectLink)}`}
+                          alt="QR Code Sambung HP"
+                          className="w-36 h-36 rounded-lg block"
+                          loading="lazy"
+                        />
+                      </div>
+                      <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 mt-2">
+                        <QrCode className="w-3.5 h-3.5" />
+                        <span>Scan dengan Kamera HP</span>
+                      </div>
+                    </div>
+
+                    {/* Info & Tombol */}
+                    <div className="space-y-2.5 flex-1 text-center md:text-left">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-[#15856c] dark:text-emerald-300 text-xs font-bold">
+                        <Smartphone className="w-3.5 h-3.5" />
+                        <span>Sinkronisasi Otomatis Antar Perangkat</span>
+                      </div>
+                      <h4 className="text-base font-black text-slate-900 dark:text-white">
+                        Buka di HP Tanpa Backup & Restore Manual
+                      </h4>
+                      <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                        Cukup <strong>scan QR Code</strong> di samping menggunakan kamera HP Anda, atau klik tombol <strong>Salin Link Cepat HP</strong> dan buka di browser HP. Saat web terbuka di HP, seluruh profil akun, PIN, dan catatan transaksi otomatis disinkronkan secara instan!
+                      </p>
+
+                      <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={handleCopySyncLink}
+                          className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#15856c] hover:bg-[#116c58] text-white text-xs font-bold transition-all shadow-xs active:scale-95"
+                        >
+                          {copiedSyncUrl ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                          <span>{copiedSyncUrl ? 'Link HP Tersalin!' : 'Salin Tautan Cepat HP'}</span>
+                        </button>
+
+                        <a
+                          href={`https://wa.me/?text=${encodeURIComponent(`Buka DompetKu di HP dengan akun dan transaksi otomatis tersinkron:\n${quickConnectLink}`)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95"
+                        >
+                          <Share2 className="w-4 h-4" />
+                          <span>Kirim ke WhatsApp</span>
+                        </a>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

@@ -129,23 +129,76 @@ export class StorageService {
   }
 
   /**
-   * Ekspor seluruh data sebagai file JSON
+   * Ekspor seluruh data (Akun, PIN, Pengaturan, dan Data Finansial Semua Profil) sebagai file JSON
    */
   static exportBackup(userId?: string): string {
-    const data = this.loadData(userId);
-    return JSON.stringify(data, null, 2);
+    const activeData = this.loadData(userId);
+    const accounts = AuthService.getAccounts();
+    const gasUrl = this.getGasUrl(userId) || this.getGasUrl();
+
+    // Kumpulkan seluruh data transaksi untuk setiap akun
+    const allUsersData: Record<string, AppData> = {};
+    accounts.forEach((acc) => {
+      allUsersData[acc.id] = this.loadData(acc.id);
+    });
+
+    const fullBackup = {
+      version: 2,
+      appName: 'DompetKu',
+      exportedAt: new Date().toISOString(),
+      activeUserId: userId || accounts[0]?.id,
+      gasUrl: gasUrl || '',
+      accounts: accounts,
+      allUsersData: allUsersData,
+      // Compatibility for legacy v1 format
+      transaksi: activeData.transaksi,
+      rekening: activeData.rekening,
+      kategori: activeData.kategori,
+      budget: activeData.budget,
+      tabungan: activeData.tabungan,
+      utang: activeData.utang,
+      piutang: activeData.piutang,
+    };
+
+    return JSON.stringify(fullBackup, null, 2);
   }
 
   /**
-   * Impor data dari string JSON backup
+   * Impor data dari file JSON cadangan (Mendukung v1 dan v2 lengkap dengan Akun & PIN)
    */
   static importBackup(jsonString: string, userId?: string): { success: boolean; data?: AppData; message: string } {
     try {
       const parsed = JSON.parse(jsonString);
+
+      // Format V2 (Lengkap dengan Akun, PIN, dan Semua Pengguna)
+      if (parsed && parsed.version === 2 && Array.isArray(parsed.accounts)) {
+        AuthService.saveAccounts(parsed.accounts);
+
+        if (parsed.gasUrl) {
+          this.setGasUrl(parsed.gasUrl, userId);
+        }
+
+        if (parsed.allUsersData && typeof parsed.allUsersData === 'object') {
+          Object.keys(parsed.allUsersData).forEach((accId) => {
+            this.saveData(parsed.allUsersData[accId], accId);
+          });
+        }
+
+        const activeId = userId || parsed.activeUserId || parsed.accounts[0]?.id;
+        const restoredData = this.loadData(activeId);
+        return {
+          success: true,
+          data: restoredData,
+          message: `Berhasil memulihkan ${parsed.accounts.length} profil akun (beserta PIN) dan seluruh catatan transaksi!`
+        };
+      }
+
+      // Format V1 Legacy (Hanya array transaksi, rekening, dll)
       if (parsed && Array.isArray(parsed.transaksi) && Array.isArray(parsed.rekening)) {
         this.saveData(parsed, userId);
-        return { success: true, data: parsed, message: 'Data backup berhasil dipulihkan' };
+        return { success: true, data: parsed, message: 'Data backup transaksi berhasil dipulihkan' };
       }
+
       return { success: false, message: 'Format data backup tidak sesuai' };
     } catch (e: any) {
       return { success: false, message: 'File JSON tidak valid: ' + e.message };

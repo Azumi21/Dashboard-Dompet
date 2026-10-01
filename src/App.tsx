@@ -89,6 +89,39 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
+  // Check for Quick Connect URL parameter (?gas=... or ?connect=...) from QR Code / Sync Link
+  useEffect(() => {
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const incomingGas = searchParams.get('gas') || searchParams.get('connect');
+      if (incomingGas && incomingGas.startsWith('http')) {
+        StorageService.setGasUrl(incomingGas, currentUser.id);
+        setGasUrl(incomingGas);
+
+        setIsRefreshing(true);
+        GasService.fetchAllData(incomingGas).then((res) => {
+          setIsRefreshing(false);
+          if (res.success && res.data) {
+            StorageService.saveData(res.data, currentUser.id);
+            setAppData(res.data);
+            const freshAccounts = AuthService.getAccounts();
+            setAllAccounts(freshAccounts);
+            const activeAcc = AuthService.getActiveAccount();
+            setCurrentUser(activeAcc);
+            showToast('Perangkat berhasil terhubung otomatis! Data transaksi dan profil akun telah sinkron.', 'success', 'Sinkronisasi Berhasil');
+          } else {
+            showToast('URL Google Apps Script disimpan: ' + (res.message || ''), 'info', 'Terhubung');
+          }
+        });
+
+        // Bersihkan parameter query dari address bar browser
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    } catch (e) {
+      console.error('Error parsing connect url param:', e);
+    }
+  }, [currentUser.id, showToast]);
+
   // Switch Account PIN Verification State
   const [switchTargetUser, setSwitchTargetUser] = useState<UserAccount | null>(null);
   const [switchModalOpen, setSwitchModalOpen] = useState<boolean>(false);
@@ -224,6 +257,12 @@ export default function App() {
     const res = StorageService.importBackup(jsonStr);
     if (res.success && res.data) {
       setAppData(res.data);
+      const updatedAccounts = AuthService.getAccounts();
+      setAllAccounts(updatedAccounts);
+      const active = AuthService.getActiveAccount();
+      setCurrentUser(active);
+      const activeGas = StorageService.getGasUrl(active.id);
+      setGasUrl(activeGas);
       showToast(res.message, 'success', 'Impor Cadangan');
     } else {
       showToast(res.message, 'error', 'Gagal Impor');

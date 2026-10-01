@@ -3,7 +3,8 @@
  * Menghubungkan Website -> Google Apps Script -> Google Spreadsheet
  */
 
-import { AppData, Transaction, Rekening, Kategori, Budget, Tabungan, Utang, Piutang } from '../types/finance';
+import { AppData, Transaction, Rekening, Kategori, Budget, Tabungan, Utang, Piutang, UserAccount } from '../types/finance';
+import { AuthService } from './authService';
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -104,6 +105,21 @@ export class GasService {
         setting: sheets.SETTING || []
       };
 
+      // Sinkronisasi otomatis akun & PIN jika tersimpan di sheet SETTING
+      if (Array.isArray(sheets.SETTING)) {
+        const accRow = sheets.SETTING.find((s: any) => s.key === 'DOMPETKU_ACCOUNTS');
+        if (accRow && accRow.value) {
+          try {
+            const parsedAccs = JSON.parse(accRow.value);
+            if (Array.isArray(parsedAccs) && parsedAccs.length > 0) {
+              AuthService.saveAccounts(parsedAccs);
+            }
+          } catch (e) {
+            console.error('Failed to parse accounts from SETTING sheet:', e);
+          }
+        }
+      }
+
       return { success: true, message: 'Data berhasil disinkronkan', data: appData };
     } catch (err: any) {
       return {
@@ -186,6 +202,12 @@ export class GasService {
    * Seed / Sync batch seluruh data lokal ke Google Spreadsheet
    */
   static async seedAllData(gasUrl: string, appData: AppData): Promise<ApiResponse> {
+    const accounts = AuthService.getAccounts();
+    const settingsWithAccounts = [
+      ...(appData.setting || []).filter((s) => s.key !== 'DOMPETKU_ACCOUNTS'),
+      { key: 'DOMPETKU_ACCOUNTS', value: JSON.stringify(accounts) }
+    ];
+
     return this.sendPost(gasUrl, {
       action: 'seed',
       allData: {
@@ -196,7 +218,21 @@ export class GasService {
         TABUNGAN: appData.tabungan,
         UTANG: appData.utang,
         PIUTANG: appData.piutang,
-        SETTING: appData.setting
+        SETTING: settingsWithAccounts
+      }
+    });
+  }
+
+  /**
+   * Khusus unggah pembaruan akun & PIN ke Google Spreadsheet SETTING
+   */
+  static async syncAccountsToSpreadsheet(gasUrl: string, accounts: UserAccount[]): Promise<ApiResponse> {
+    return this.sendPost(gasUrl, {
+      action: 'update',
+      sheet: 'SETTING',
+      data: {
+        key: 'DOMPETKU_ACCOUNTS',
+        value: JSON.stringify(accounts)
       }
     });
   }
