@@ -47,11 +47,15 @@ import { KategoriView } from './views/KategoriView';
 import { PengaturanView } from './views/PengaturanView';
 import { LoginView } from './views/LoginView';
 import { AuthService } from './services/authService';
+import { D1Service } from './services/d1Service';
 
 export default function App() {
   // Multi-User Active Account & List
   const [currentUser, setCurrentUser] = useState<UserAccount>(() => AuthService.getActiveAccount());
   const [allAccounts, setAllAccounts] = useState<UserAccount[]>(() => AuthService.getAccounts());
+
+  // Cloudflare D1 Connection State
+  const [isD1Connected, setIsD1Connected] = useState<boolean>(false);
 
   // Authentication & Privacy Lock State
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => AuthService.isAuthenticated());
@@ -88,6 +92,28 @@ export default function App() {
   const dismissToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
+
+  // Check Cloudflare D1 Database on mount and auto-load online data
+  useEffect(() => {
+    D1Service.checkStatus().then((status) => {
+      if (status.success) {
+        setIsD1Connected(true);
+        D1Service.loadData(currentUser.id).then((res) => {
+          if (res.success) {
+            if (res.accounts && res.accounts.length > 0) {
+              AuthService.saveAccounts(res.accounts);
+              const freshAccs = AuthService.getAccounts();
+              setAllAccounts(freshAccs);
+            }
+            if (res.appData) {
+              StorageService.saveData(res.appData, currentUser.id);
+              setAppData(res.appData);
+            }
+          }
+        }).catch(() => {});
+      }
+    }).catch(() => {});
+  }, [currentUser.id]);
 
   // Check for Quick Connect URL parameter (?sync=... or ?gas=...) from QR Code / Sync Link
   useEffect(() => {

@@ -23,6 +23,7 @@ import {
 import { AuthService } from '../services/authService';
 import { GasService } from '../services/gasService';
 import { StorageService } from '../services/storageService';
+import { D1Service } from '../services/d1Service';
 import { UserAccount, UserAvatarColor } from '../types/finance';
 
 interface LoginViewProps {
@@ -115,6 +116,16 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           }
         });
       }
+
+      // Cek apakah Cloudflare D1 Database aktif dan memuat akun
+      D1Service.loadData('acc_azmin').then((d1Res) => {
+        if (d1Res.success && d1Res.accounts && d1Res.accounts.length > 0) {
+          AuthService.saveAccounts(d1Res.accounts);
+          const fresh = AuthService.getAccounts();
+          setAccounts(fresh);
+          setSelectedAccount(fresh[0] || null);
+        }
+      }).catch(() => {});
     } catch (e) {
       console.error(e);
     }

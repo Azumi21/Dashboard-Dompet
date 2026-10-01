@@ -2,6 +2,7 @@ import { AppData } from '../types/finance';
 import { getInitialAppData } from '../data/demoData';
 import { GasService } from './gasService';
 import { AuthService } from './authService';
+import { D1Service } from './d1Service';
 
 const DEFAULT_STORAGE_KEY = 'dompetku_app_data_v1';
 const DEFAULT_GAS_URL_KEY = 'dompetku_gas_url_v1';
@@ -62,6 +63,11 @@ export class StorageService {
       if (userId === 'acc_azmin' || !userId) {
         localStorage.setItem(DEFAULT_STORAGE_KEY, JSON.stringify(data));
       }
+
+      // Background sync ke Cloudflare D1 jika aktif
+      const activeId = userId || AuthService.getActiveAccount().id;
+      const accounts = AuthService.getAccounts();
+      D1Service.syncData(activeId, data, accounts).catch(() => {});
     } catch (e) {
       console.error('Error saving to localStorage:', e);
     }
