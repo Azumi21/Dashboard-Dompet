@@ -12,9 +12,11 @@ import {
   Tags,
   Settings,
   X,
-  Database
+  Database,
+  Lock
 } from 'lucide-react';
-import { NavigationMenu } from '../types/finance';
+import { NavigationMenu, UserAccount } from '../types/finance';
+import { getAvatarColorClass } from '../utils/userColors';
 
 interface SidebarProps {
   currentMenu: NavigationMenu;
@@ -22,6 +24,8 @@ interface SidebarProps {
   mobileOpen: boolean;
   onCloseMobile: () => void;
   isGasConnected: boolean;
+  onLockApp?: () => void;
+  currentUser?: UserAccount;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -29,7 +33,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectMenu,
   mobileOpen,
   onCloseMobile,
-  isGasConnected
+  isGasConnected,
+  onLockApp,
+  currentUser
 }) => {
   const menuItems: { id: NavigationMenu; label: string; icon: React.ReactNode }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
@@ -80,6 +86,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <X className="w-5 h-5" />
         </button>
       </div>
+
+      {/* User Profile Summary */}
+      {currentUser && (
+        <div className="mx-3 mt-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60 flex items-center gap-2.5">
+          <div
+            className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs border shrink-0 ${getAvatarColorClass(
+              currentUser.avatarColor
+            )}`}
+          >
+            {currentUser.name.charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+              {currentUser.name}
+            </div>
+            <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
+              {currentUser.role}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Database Status Ribbon */}
       <div className="px-3.5 py-2 mx-3 mt-3 bg-[#eaf5f1] dark:bg-emerald-950/40 rounded-xl border border-[#c3e6d8] dark:border-emerald-800/60 flex items-center gap-2.5 text-xs">
@@ -161,11 +188,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
         })}
       </div>
 
-      {/* Footer Branding */}
-      <div className="p-3 border-t border-[#e2ede8] dark:border-slate-800 text-center text-xs text-slate-400">
-        <p className="font-mono text-[10px] font-semibold text-[#15856c] dark:text-emerald-400">
-          app.keuanganpribadi.web.id
-        </p>
+      {/* Footer Branding & Lock */}
+      <div className="p-3 border-t border-[#e2ede8] dark:border-slate-800 space-y-2">
+        {onLockApp && (
+          <button
+            onClick={onLockApp}
+            className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 text-slate-600 dark:text-slate-400 text-xs font-semibold transition-colors border border-slate-200/70 dark:border-slate-700/60"
+          >
+            <Lock className="w-3.5 h-3.5" />
+            <span>Kunci Aplikasi</span>
+          </button>
+        )}
+        <div className="text-center text-xs text-slate-400">
+          <p className="font-mono text-[10px] font-semibold text-[#15856c] dark:text-emerald-400">
+            app.keuanganpribadi.web.id
+          </p>
+        </div>
       </div>
     </div>
   );

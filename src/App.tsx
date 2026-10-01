@@ -15,6 +15,7 @@ import {
   Transaction,
   TransactionType,
   Utang,
+  UserAccount,
 } from './types/finance';
 import { StorageService } from './services/storageService';
 import { GasService } from './services/gasService';
@@ -30,6 +31,7 @@ import { KategoriModal } from './components/modals/KategoriModal';
 import { BudgetModal } from './components/modals/BudgetModal';
 import { TabunganModal } from './components/modals/TabunganModal';
 import { UtangPiutangModal } from './components/modals/UtangPiutangModal';
+import { SwitchAccountModal } from './components/modals/SwitchAccountModal';
 
 // Views
 import { DashboardView } from './views/DashboardView';
@@ -43,11 +45,20 @@ import { UtangPiutangView } from './views/UtangPiutangView';
 import { LaporanView } from './views/LaporanView';
 import { KategoriView } from './views/KategoriView';
 import { PengaturanView } from './views/PengaturanView';
+import { LoginView } from './views/LoginView';
+import { AuthService } from './services/authService';
 
 export default function App() {
+  // Multi-User Active Account & List
+  const [currentUser, setCurrentUser] = useState<UserAccount>(() => AuthService.getActiveAccount());
+  const [allAccounts, setAllAccounts] = useState<UserAccount[]>(() => AuthService.getAccounts());
+
+  // Authentication & Privacy Lock State
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => AuthService.isAuthenticated());
+
   // App Data & GAS URL
-  const [appData, setAppData] = useState<AppData>(() => StorageService.loadData());
-  const [gasUrl, setGasUrl] = useState<string>(() => StorageService.getGasUrl());
+  const [appData, setAppData] = useState<AppData>(() => StorageService.loadData(AuthService.getActiveAccount().id));
+  const [gasUrl, setGasUrl] = useState<string>(() => StorageService.getGasUrl(AuthService.getActiveAccount().id));
   const [currentMenu, setCurrentMenu] = useState<NavigationMenu>('dashboard');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -77,6 +88,45 @@ export default function App() {
   const dismissToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
+
+  // Switch Account PIN Verification State
+  const [switchTargetUser, setSwitchTargetUser] = useState<UserAccount | null>(null);
+  const [switchModalOpen, setSwitchModalOpen] = useState<boolean>(false);
+
+  const handleRequestSwitchAccount = useCallback((newUser: UserAccount) => {
+    if (newUser.id === currentUser.id) return;
+    setSwitchTargetUser(newUser);
+    setSwitchModalOpen(true);
+  }, [currentUser.id]);
+
+  const handleConfirmSwitchAccount = useCallback((verifiedUser: UserAccount) => {
+    AuthService.setActiveAccountId(verifiedUser.id);
+    setCurrentUser(verifiedUser);
+    const data = StorageService.loadData(verifiedUser.id);
+    setAppData(data);
+    const userGas = StorageService.getGasUrl(verifiedUser.id);
+    setGasUrl(userGas);
+    setAllAccounts(AuthService.getAccounts());
+    showToast(`Verifikasi PIN berhasil! Selamat datang, ${verifiedUser.name}.`, 'success', 'Beralih Akun');
+  }, [showToast]);
+
+  const handleLoginSuccess = useCallback((user: UserAccount) => {
+    AuthService.setActiveAccountId(user.id);
+    setCurrentUser(user);
+    const data = StorageService.loadData(user.id);
+    setAppData(data);
+    const userGas = StorageService.getGasUrl(user.id);
+    setGasUrl(userGas);
+    setAllAccounts(AuthService.getAccounts());
+    setIsAuthenticated(true);
+    showToast(`Selamat datang, ${user.name}! Akses dompet dibuka.`, 'success', 'Login Berhasil');
+  }, [showToast]);
+
+  const handleLockApp = useCallback(() => {
+    AuthService.logout();
+    setIsAuthenticated(false);
+    showToast('Aplikasi berhasil dikunci demi privasi Anda.', 'info', 'Terkunci');
+  }, [showToast]);
 
   // Confirm Modal System
   const [confirmModal, setConfirmModal] = useState<{
@@ -545,6 +595,16 @@ export default function App() {
     setTransactionModalOpen(true);
   };
 
+  // If locked or unauthenticated, show privacy LoginView
+  if (!isAuthenticated) {
+    return (
+      <div className={isDarkMode ? 'dark' : ''}>
+        <LoginView onLoginSuccess={handleLoginSuccess} />
+        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-fintech-canvas text-slate-800 dark:text-slate-100 flex flex-col antialiased font-sans">
       {/* Toast Notifications */}
@@ -568,6 +628,8 @@ export default function App() {
           mobileOpen={mobileNavOpen}
           onCloseMobile={() => setMobileNavOpen(false)}
           isGasConnected={Boolean(gasUrl)}
+          onLockApp={handleLockApp}
+          currentUser={currentUser}
         />
 
         {/* Content Column */}
@@ -587,6 +649,11 @@ export default function App() {
               setBudgetToEdit(null);
               setBudgetModalOpen(true);
             }}
+            onLockApp={handleLockApp}
+            currentUser={currentUser}
+            allAccounts={allAccounts}
+            onSwitchAccount={handleRequestSwitchAccount}
+            onManageAccounts={() => setCurrentMenu('pengaturan')}
           />
 
           {/* Main Body View */}
@@ -740,6 +807,9 @@ export default function App() {
                 onImportBackup={handleImportBackup}
                 isDarkMode={isDarkMode}
                 onToggleDarkMode={() => setIsDarkMode((prev) => !prev)}
+                onLockApp={handleLockApp}
+                currentUser={currentUser}
+                onSwitchAccount={handleRequestSwitchAccount}
               />
             )}
           </main>
@@ -794,6 +864,17 @@ export default function App() {
         onSaveUtang={handleSaveUtang}
         onSavePiutang={handleSavePiutang}
         itemToEdit={utangPiutangToEdit}
+      />
+
+      {/* Switch Account PIN Verification Modal */}
+      <SwitchAccountModal
+        isOpen={switchModalOpen}
+        targetAccount={switchTargetUser}
+        onClose={() => {
+          setSwitchModalOpen(false);
+          setSwitchTargetUser(null);
+        }}
+        onSuccess={handleConfirmSwitchAccount}
       />
     </div>
   );

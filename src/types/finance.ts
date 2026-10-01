@@ -116,3 +116,16 @@ export type NavigationMenu =
   | 'laporan'
   | 'kategori'
   | 'pengaturan';
+
+export type UserAvatarColor = 'emerald' | 'rose' | 'indigo' | 'amber' | 'sky' | 'purple' | 'teal' | 'orange';
+
+export interface UserAccount {
+  id: string;
+  name: string;
+  username: string;
+  role: string;
+  avatarColor: UserAvatarColor;
+  pin: string;
+  createdAt: string;
+}
+

@@ -9,9 +9,16 @@ import {
   Sun,
   Moon,
   Database,
-  PieChart
+  PieChart,
+  Lock,
+  Users,
+  ChevronDown,
+  UserCheck,
+  UserPlus,
+  Settings
 } from 'lucide-react';
-import { NavigationMenu, TransactionType } from '../types/finance';
+import { NavigationMenu, TransactionType, UserAccount } from '../types/finance';
+import { getAvatarColorClass } from '../utils/userColors';
 
 interface HeaderProps {
   currentMenu: NavigationMenu;
@@ -24,6 +31,11 @@ interface HeaderProps {
   onToggleDarkMode: () => void;
   onOpenTransactionModal: (type?: TransactionType) => void;
   onOpenBudgetModal: () => void;
+  onLockApp?: () => void;
+  currentUser?: UserAccount;
+  allAccounts?: UserAccount[];
+  onSwitchAccount?: (user: UserAccount) => void;
+  onManageAccounts?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -37,7 +49,24 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleDarkMode,
   onOpenTransactionModal,
   onOpenBudgetModal,
+  onLockApp,
+  currentUser,
+  allAccounts = [],
+  onSwitchAccount,
+  onManageAccounts,
 }) => {
+  const [profileOpen, setProfileOpen] = React.useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   const titles: Record<NavigationMenu, { title: string; subtitle: string }> = {
     dashboard: { title: 'Dashboard Keuangan', subtitle: 'Pantau, kelola, dan tingkatkan kondisi finansial Anda' },
     transaksi: { title: 'Daftar Transaksi', subtitle: 'Catatan seluruh transaksi pemasukan, pengeluaran & transfer' },
@@ -112,10 +141,148 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="hidden sm:inline">Tambah Transaksi</span>
           </button>
 
+          {/* User Profile & Account Switcher Dropdown */}
+          {currentUser && (
+            <div className="relative" ref={dropdownRef}>
+              <button
+                type="button"
+                onClick={() => setProfileOpen(!profileOpen)}
+                className="flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-[#eaf5f1] dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700 transition-all text-xs font-semibold"
+                aria-expanded={profileOpen}
+              >
+                <div
+                  className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold text-xs border ${getAvatarColorClass(
+                    currentUser.avatarColor
+                  )}`}
+                >
+                  {currentUser.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="hidden md:flex flex-col text-left leading-tight">
+                  <span className="text-slate-800 dark:text-slate-200 font-bold truncate max-w-[90px]">
+                    {currentUser.name}
+                  </span>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[90px]">
+                    {currentUser.role}
+                  </span>
+                </div>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+
+              {/* Profile Dropdown Menu */}
+              {profileOpen && (
+                <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-50 p-2 animate-scaleUp">
+                  {/* Current Active Account Header */}
+                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 mb-2 flex items-center gap-2.5 border border-slate-100 dark:border-slate-700/50">
+                    <div
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm border shrink-0 ${getAvatarColorClass(
+                        currentUser.avatarColor
+                      )}`}
+                    >
+                      {currentUser.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                        {currentUser.name}
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                        @{currentUser.username} • {currentUser.role}
+                      </div>
+                    </div>
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="Aktif" />
+                  </div>
+
+                  {/* Switch to Other Accounts */}
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 py-1">
+                    Ganti Profil Akun
+                  </div>
+                  <div className="space-y-1 mb-2">
+                    {allAccounts
+                      .filter((acc) => acc.id !== currentUser.id)
+                      .map((acc) => (
+                        <button
+                          key={acc.id}
+                          type="button"
+                          onClick={() => {
+                            setProfileOpen(false);
+                            if (onSwitchAccount) onSwitchAccount(acc);
+                          }}
+                          className="w-full flex items-center justify-between p-2 rounded-xl text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors group"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div
+                              className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs border ${getAvatarColorClass(
+                                acc.avatarColor
+                              )}`}
+                            >
+                              {acc.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="truncate">
+                              <div className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-[#15856c] transition-colors truncate">
+                                {acc.name}
+                              </div>
+                              <div className="text-[10px] text-slate-400 truncate">
+                                {acc.role}
+                              </div>
+                            </div>
+                          </div>
+                          <span className="text-[10px] text-[#15856c] dark:text-emerald-400 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                            Pilih
+                          </span>
+                        </button>
+                      ))}
+                  </div>
+
+                  {/* Manage Accounts & Lock */}
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1">
+                    {onManageAccounts && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileOpen(false);
+                          onManageAccounts();
+                        }}
+                        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                      >
+                        <Users className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Kelola Semua Akun</span>
+                      </button>
+                    )}
+
+                    {onLockApp && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileOpen(false);
+                          onLockApp();
+                        }}
+                        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                      >
+                        <Lock className="w-3.5 h-3.5" />
+                        <span>Kunci / Ganti Pengguna</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Language Indicator Badge matching image.png (ID) */}
           <div className="hidden sm:flex items-center justify-center px-2.5 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
             ID
           </div>
+
+          {/* Lock Privacy Button */}
+          {onLockApp && (
+            <button
+              onClick={onLockApp}
+              className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 transition-colors border border-slate-200/80 dark:border-slate-700"
+              title="Kunci Aplikasi (Privasi)"
+              aria-label="Kunci Aplikasi"
+            >
+              <Lock className="w-4 h-4" />
+            </button>
+          )}
 
           {/* Dark Mode Toggle matching image.png */}
           <button
